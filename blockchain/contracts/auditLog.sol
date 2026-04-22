@@ -3,8 +3,7 @@ pragma solidity ^0.8.28;
 
 contract auditLog {
 
-
-    enum ActionType {
+    enum actionType {
         REGISTERED,
         PROMOTED,
         DEMOTED,
@@ -18,26 +17,26 @@ contract auditLog {
         LOGIN
     }
 
-    struct LogEntry {
-        ActionType actionType;  
-        address actor; 
+    struct logEntry {
+        actionType action;
+        address actor;
         address target;
         string details;
         uint256 timestamp;
         uint256 blockNumber;
     }
 
-    LogEntry[] public logs;
+    logEntry[] public logs;
 
     mapping(address => uint256) public lastMessageTime;
     mapping(address => uint256[]) private agentLogs;
 
-    address public vaultRegistry;
-    address public chambers;
+    address public registryContract;
+    address public chambersContract;
     address public owner;
 
-    event ActionLogged(
-        ActionType indexed actionType,
+    event actionLogged(
+        actionType indexed action,
         address indexed actor,
         address indexed target,
         uint256 timestamp,
@@ -47,82 +46,75 @@ contract auditLog {
     modifier onlyAuthorized() {
         require(
             msg.sender == owner ||
-            msg.sender == vaultRegistry ||
-            msg.sender == chambers,
-            "Not authorized to write to audit log"
+            msg.sender == registryContract ||
+            msg.sender == chambersContract,
+            "Not authorized"
         );
         _;
     }
+
     constructor() {
         owner = msg.sender;
     }
 
     function setAuthorizedContracts(
-        address _vaultRegistry,
+        address _registry,
         address _chambers
     ) external {
         require(msg.sender == owner, "Only owner");
-        vaultRegistry = _vaultRegistry;
-        chambers = _chambers;
+        registryContract = _registry;
+        chambersContract = _chambers;
     }
 
-    function logAction(
-        ActionType actionType,
-        address actor,
-        address target,
-        string memory details
+    function log(
+        actionType _action,
+        address _actor,
+        address _target,
+        string memory _details
     ) external onlyAuthorized {
 
-        LogEntry memory entry = LogEntry({
-            actionType: actionType,
-            actor: actor,
-            target: target,
-            details: details,
+        logEntry memory entry = logEntry({
+            action: _action,
+            actor: _actor,
+            target: _target,
+            details: _details,
             timestamp: block.timestamp,
-            blockNumber: block.number 
+            blockNumber: block.number
         });
 
         uint256 index = logs.length;
-
         logs.push(entry);
-        agentLogs[actor].push(index);
-        if (target != address(0)) {
-            agentLogs[target].push(index);
+        agentLogs[_actor].push(index);
+
+        if (_target != address(0)) {
+            agentLogs[_target].push(index);
         }
 
-        if (actionType == ActionType.MESSAGE_SENT || 
-            actionType == ActionType.FILE_SENT) {
-            lastMessageTime[actor] = block.timestamp;
+        if (_action == actionType.MESSAGE_SENT || _action == actionType.FILE_SENT) {
+            lastMessageTime[_actor] = block.timestamp;
         }
 
-        emit ActionLogged(actionType, actor, target, block.timestamp, block.number);
+        emit actionLogged(_action, _actor, _target, block.timestamp, block.number);
     }
 
     function getLastActivity(address wallet) external view returns (uint256) {
         return lastMessageTime[wallet];
     }
 
-    function getAgentLogs(address wallet) external view returns (LogEntry[] memory) {
+    function getAgentLogs(address wallet) external view returns (logEntry[] memory) {
         uint256[] memory indices = agentLogs[wallet];
-        LogEntry[] memory result = new LogEntry[](indices.length);
-
+        logEntry[] memory result = new logEntry[](indices.length);
         for (uint256 i = 0; i < indices.length; i++) {
             result[i] = logs[indices[i]];
         }
-
         return result;
     }
 
-    function getAllLogs() external view returns (LogEntry[] memory) {
+    function getAllLogs() external view returns (logEntry[] memory) {
         return logs;
     }
 
     function getTotalLogs() external view returns (uint256) {
         return logs.length;
-    }
-
-    function getLog(uint256 index) external view returns (LogEntry memory) {
-        require(index < logs.length, "Log does not exist");
-        return logs[index];
     }
 }
