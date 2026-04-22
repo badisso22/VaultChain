@@ -1,32 +1,32 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "./VaultRegistry.sol";
-import "./AuditLog.sol";
+import "./vaultRegistry.sol";
+import "./auditLog.sol";
 
 contract chambers {
-    VaultRegistry public vaultRegistry;
-    AuditLog public auditLog;
 
+    vaultRegistry public registry;
+    auditLog public logger;
     address public architect;
 
-    enum AccessLevel {
+    enum accessLevel {
         OPEN,
         GUARDIAN,
         ARCHITECT
     }
 
-    struct Chamber {
+    struct chamber {
         uint256 id;
         string name;
         string description;
-        AccessLevel accessLevel;
+        accessLevel access;
         address createdBy;
         uint256 createdAt;
         bool exists;
     }
 
-    struct Message {
+    struct message {
         uint256 id;
         address sender;
         string displayName;
@@ -38,174 +38,119 @@ contract chambers {
         uint256 blockNumber;
     }
 
-    mapping(uint256 => Chamber) public chambers;
-    mapping(uint256 => Message[]) public chamberMessages;
+    mapping(uint256 => chamber) public chamberList;
+    mapping(uint256 => message[]) public chamberMessages;
 
     uint256 public chamberCount;
     uint256 public totalMessages;
 
-    event ChamberCreated(
-        uint256 indexed chamberId,
-        string name,
-        AccessLevel accessLevel,
-        address indexed createdBy,
-        uint256 timestamp
-    );
-
-    event ChamberDeleted(
-        uint256 indexed chamberId,
-        address indexed deletedBy,
-        uint256 timestamp
-    );
-
-    event MessageSent(
-        uint256 indexed chamberId,
-        address indexed sender,
-        string content,
-        uint256 timestamp,
-        uint256 blockNumber
-    );
-
-    event FileSent(
-        uint256 indexed chamberId,
-        address indexed sender,
-        string ipfsCID,
-        string fileName,
-        uint256 timestamp
-    );
+    event chamberCreated(uint256 indexed chamberId, string name, address indexed createdBy, uint256 timestamp);
+    event chamberDeleted(uint256 indexed chamberId, address indexed deletedBy, uint256 timestamp);
+    event messageSent(uint256 indexed chamberId, address indexed sender, string content, uint256 timestamp);
+    event fileSent(uint256 indexed chamberId, address indexed sender, string ipfsCID, string fileName, uint256 timestamp);
 
     modifier onlyAgent() {
-        require(
-            vaultRegistry.isRegistered(msg.sender),
-            "You must be registered"
-        );
-        require(
-            !vaultRegistry.isRevoked(msg.sender),
-            "Your wallet is banned"
-        );
+        require(registry.isRegistered(msg.sender), "You must be registered");
+        require(!registry.isRevoked(msg.sender), "Your wallet is banned");
         _;
     }
 
     modifier onlyGuardianOrArchitect() {
         require(
-            vaultRegistry.hasRole(vaultRegistry.GUARDIAN_ROLE(), msg.sender) ||
-            vaultRegistry.hasRole(vaultRegistry.ARCHITECT_ROLE(), msg.sender),
-            "Only Guardians and Architect can do this"
+            registry.hasRole(registry.GUARDIAN_ROLE(), msg.sender) ||
+            registry.hasRole(registry.ARCHITECT_ROLE(), msg.sender),
+            "Only Guardians and Architect"
         );
         _;
     }
 
     modifier hasAccess(uint256 chamberId) {
-        require(chambers[chamberId].exists, "Chamber does not exist");
-
-        AccessLevel required = chambers[chamberId].accessLevel;
-
-        if (required == AccessLevel.ARCHITECT) {
+        require(chamberList[chamberId].exists, "Chamber does not exist");
+        accessLevel required = chamberList[chamberId].access;
+        if (required == accessLevel.ARCHITECT) {
+            require(registry.hasRole(registry.ARCHITECT_ROLE(), msg.sender), "Architect only");
+        } else if (required == accessLevel.GUARDIAN) {
             require(
-                vaultRegistry.hasRole(vaultRegistry.ARCHITECT_ROLE(), msg.sender),
-                "Only Architect can access this chamber"
-            );
-        } else if (required == AccessLevel.GUARDIAN) {
-            require(
-                vaultRegistry.hasRole(vaultRegistry.GUARDIAN_ROLE(), msg.sender) ||
-                vaultRegistry.hasRole(vaultRegistry.ARCHITECT_ROLE(), msg.sender),
-                "Only Guardians and Architect can access this chamber"
+                registry.hasRole(registry.GUARDIAN_ROLE(), msg.sender) ||
+                registry.hasRole(registry.ARCHITECT_ROLE(), msg.sender),
+                "Guardians and Architect only"
             );
         }
         _;
     }
 
-    constructor(address _vaultRegistry, address _auditLog) {
-        vaultRegistry = VaultRegistry(_vaultRegistry);
-        auditLog = AuditLog(_auditLog);
+    constructor(address _registry, address _logger) {
+        registry = vaultRegistry(_registry);
+        logger = auditLog(_logger);
         architect = msg.sender;
-
-        _createDefaultChambers();
+        createDefaultChambers();
     }
 
-    function _createDefaultChambers() internal {
-        _createChamber("general", "Open chat for all agents", AccessLevel.OPEN);
-        _createChamber("introductions", "New agents introduce themselves", AccessLevel.OPEN);
-        _createChamber("guardians-hall", "Guardians and Architect only", AccessLevel.GUARDIAN);
-        _createChamber("architects-vault", "Architect only", AccessLevel.ARCHITECT);
+    function createDefaultChambers() internal {
+        newChamber("general", "Open chat for all agents", accessLevel.OPEN);
+        newChamber("introductions", "Introduce yourself", accessLevel.OPEN);
+        newChamber("guardians-hall", "Guardians only", accessLevel.GUARDIAN);
+        newChamber("architects-vault", "Architect only", accessLevel.ARCHITECT);
     }
 
-    function _createChamber(
+    function newChamber(
         string memory name,
         string memory description,
-        AccessLevel accessLevel
+        accessLevel access
     ) internal returns (uint256) {
         chamberCount++;
-        uint256 newId = chamberCount;
+        uint256 id = chamberCount;
 
-        chambers[newId] = Chamber({
-            id: newId,
+        chamberList[id] = chamber({
+            id: id,
             name: name,
             description: description,
-            accessLevel: accessLevel,
+            access: access,
             createdBy: msg.sender,
             createdAt: block.timestamp,
             exists: true
         });
 
-        emit ChamberCreated(newId, name, accessLevel, msg.sender, block.timestamp);
-        return newId;
+        emit chamberCreated(id, name, msg.sender, block.timestamp);
+        return id;
     }
 
     function createChamber(
         string memory name,
         string memory description,
-        AccessLevel accessLevel
+        accessLevel access
     ) external onlyAgent onlyGuardianOrArchitect returns (uint256) {
-        require(bytes(name).length > 0, "Chamber name cannot be empty");
-        require(bytes(name).length <= 32, "Chamber name too long");
+        require(bytes(name).length > 0, "Name cannot be empty");
+        require(bytes(name).length <= 32, "Name too long");
 
-        uint256 newId = _createChamber(name, description, accessLevel);
+        uint256 id = newChamber(name, description, access);
 
-        auditLog.logAction(
-            AuditLog.ActionType.CHAMBER_CREATED,
-            msg.sender,
-            address(0),
-            name
-        );
+        logger.log(auditLog.actionType.CHAMBER_CREATED, msg.sender, address(0), name);
 
-        return newId;
+        return id;
     }
 
-    function deleteChamber(uint256 chamberId) 
-        external 
-        onlyAgent 
-        onlyGuardianOrArchitect 
-    {
-        require(chambers[chamberId].exists, "Chamber does not exist");
-        if (!vaultRegistry.hasRole(vaultRegistry.ARCHITECT_ROLE(), msg.sender)) {
-            require(
-                chambers[chamberId].createdBy == msg.sender,
-                "You can only delete chambers you created"
-            );
+    function deleteChamber(uint256 chamberId) external onlyAgent onlyGuardianOrArchitect {
+        require(chamberList[chamberId].exists, "Chamber does not exist");
+
+        if (!registry.hasRole(registry.ARCHITECT_ROLE(), msg.sender)) {
+            require(chamberList[chamberId].createdBy == msg.sender, "Not your chamber");
         }
 
-        chambers[chamberId].exists = false;
-        auditLog.logAction(
-            AuditLog.ActionType.CHAMBER_DELETED,
-            msg.sender,
-            address(0),
-            chambers[chamberId].name
-        );
+        chamberList[chamberId].exists = false;
 
-        emit ChamberDeleted(chamberId, msg.sender, block.timestamp);
+        logger.log(auditLog.actionType.CHAMBER_DELETED, msg.sender, address(0), chamberList[chamberId].name);
+
+        emit chamberDeleted(chamberId, msg.sender, block.timestamp);
     }
 
-    function sendMessage(
-        uint256 chamberId,
-        string memory content
-    ) external onlyAgent hasAccess(chamberId) {
+    function sendMessage(uint256 chamberId, string memory content) external onlyAgent hasAccess(chamberId) {
         require(bytes(content).length > 0, "Message cannot be empty");
         require(bytes(content).length <= 1000, "Message too long");
 
-        VaultRegistry.Agent memory agent = vaultRegistry.getAgent(msg.sender);
+        vaultRegistry.Agent memory agent = registry.getAgent(msg.sender);
 
-        Message memory newMessage = Message({
+        message memory newMsg = message({
             id: totalMessages,
             sender: msg.sender,
             displayName: agent.displayName,
@@ -217,30 +162,21 @@ contract chambers {
             blockNumber: block.number
         });
 
-        chamberMessages[chamberId].push(newMessage);
+        chamberMessages[chamberId].push(newMsg);
         totalMessages++;
 
-        auditLog.logAction(
-            AuditLog.ActionType.MESSAGE_SENT,
-            msg.sender,
-            address(0),
-            content
-        );
+        logger.log(auditLog.actionType.MESSAGE_SENT, msg.sender, address(0), content);
 
-        emit MessageSent(chamberId, msg.sender, content, block.timestamp, block.number);
+        emit messageSent(chamberId, msg.sender, content, block.timestamp);
     }
 
-    function sendFile(
-        uint256 chamberId,
-        string memory ipfsCID,
-        string memory fileName
-    ) external onlyAgent hasAccess(chamberId) {
-        require(bytes(ipfsCID).length > 0, "IPFS CID cannot be empty");
+    function sendFile(uint256 chamberId, string memory ipfsCID, string memory fileName) external onlyAgent hasAccess(chamberId) {
+        require(bytes(ipfsCID).length > 0, "CID cannot be empty");
         require(bytes(fileName).length > 0, "File name cannot be empty");
 
-        VaultRegistry.Agent memory agent = vaultRegistry.getAgent(msg.sender);
+        vaultRegistry.Agent memory agent = registry.getAgent(msg.sender);
 
-        Message memory newMessage = Message({
+        message memory newMsg = message({
             id: totalMessages,
             sender: msg.sender,
             displayName: agent.displayName,
@@ -252,61 +188,39 @@ contract chambers {
             blockNumber: block.number
         });
 
-        chamberMessages[chamberId].push(newMessage);
+        chamberMessages[chamberId].push(newMsg);
         totalMessages++;
 
-        auditLog.logAction(
-            AuditLog.ActionType.FILE_SENT,
-            msg.sender,
-            address(0),
-            fileName
-        );
+        logger.log(auditLog.actionType.FILE_SENT, msg.sender, address(0), fileName);
 
-        emit FileSent(chamberId, msg.sender, ipfsCID, fileName, block.timestamp);
+        emit fileSent(chamberId, msg.sender, ipfsCID, fileName, block.timestamp);
     }
 
-    function getMessages(uint256 chamberId) 
-        external 
-        view 
-        onlyAgent
-        returns (Message[] memory) 
-    {
-        require(chambers[chamberId].exists, "Chamber does not exist");
+    function getMessages(uint256 chamberId) external view onlyAgent returns (message[] memory) {
+        require(chamberList[chamberId].exists, "Chamber does not exist");
         return chamberMessages[chamberId];
     }
 
-    function getChambers() external view returns (Chamber[] memory) {
+    function getChambers() external view returns (chamber[] memory) {
         uint256 activeCount = 0;
         for (uint256 i = 1; i <= chamberCount; i++) {
-            if (chambers[i].exists) activeCount++;
+            if (chamberList[i].exists) activeCount++;
         }
 
-        Chamber[] memory activeChambers = new Chamber[](activeCount);
+        chamber[] memory active = new chamber[](activeCount);
         uint256 index = 0;
         for (uint256 i = 1; i <= chamberCount; i++) {
-            if (chambers[i].exists) {
-                activeChambers[index] = chambers[i];
+            if (chamberList[i].exists) {
+                active[index] = chamberList[i];
                 index++;
             }
         }
 
-        return activeChambers;
+        return active;
     }
 
-    function getChamber(uint256 chamberId) 
-        external 
-        view 
-        returns (Chamber memory) 
-    {
-        require(chambers[chamberId].exists, "Chamber does not exist");
-        return chambers[chamberId];
-    }
-
-    function getMessageCount(uint256 chamberId) 
-        external 
-        view 
-        returns (uint256) 
-    {
-        return chamberMessages[chamberId].length;
+    function getChamber(uint256 chamberId) external view returns (chamber memory) {
+        require(chamberList[chamberId].exists, "Chamber does not exist");
+        return chamberList[chamberId];
     }
 }
