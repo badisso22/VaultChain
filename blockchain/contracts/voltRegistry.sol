@@ -1,8 +1,9 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract VaultRegistry is AccessControl {
+contract vaultRegistry is AccessControl {
 
     bytes32 public constant ARCHITECT_ROLE = keccak256("ARCHITECT_ROLE");
     bytes32 public constant GUARDIAN_ROLE = keccak256("GUARDIAN_ROLE");
