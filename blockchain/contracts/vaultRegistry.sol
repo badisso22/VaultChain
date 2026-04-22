@@ -10,15 +10,14 @@ contract vaultRegistry is AccessControl {
     bytes32 public constant AGENT_ROLE = keccak256("AGENT_ROLE");
 
     struct Agent {
-        string displayName;   
-        bool isRegistered;    
-        bool isRevoked;       
-        uint256 joinedAt;    
-        uint256 trustScore;   
+        string displayName;
+        bool isRegistered;
+        bool isRevoked;
+        uint256 joinedAt;
+        uint256 trustScore;
     }
 
     mapping(address => Agent) public agents;
-
     address[] public agentList;
 
     event AgentRegistered(address indexed wallet, string displayName, uint256 timestamp);
@@ -28,10 +27,8 @@ contract vaultRegistry is AccessControl {
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-
         _grantRole(ARCHITECT_ROLE, msg.sender);
     }
-
 
     function register(string memory displayName) external {
         require(!agents[msg.sender].isRegistered, "Already registered");
@@ -43,9 +40,10 @@ contract vaultRegistry is AccessControl {
             displayName: displayName,
             isRegistered: true,
             isRevoked: false,
-            joinedAt: block.timestamp,  
-            trustScore: 5               
+            joinedAt: block.timestamp,
+            trustScore: 5
         });
+
         _grantRole(AGENT_ROLE, msg.sender);
         agentList.push(msg.sender);
 
@@ -71,8 +69,7 @@ contract vaultRegistry is AccessControl {
         require(!hasRole(GUARDIAN_ROLE, wallet), "Already a Guardian");
 
         _grantRole(GUARDIAN_ROLE, wallet);
-
-        _addTrustPoints(wallet, 50);
+        addTrustPoints(wallet, 50);
     }
 
     function demoteToAgent(address wallet) external onlyRole(ARCHITECT_ROLE) {
@@ -80,13 +77,13 @@ contract vaultRegistry is AccessControl {
         _revokeRole(GUARDIAN_ROLE, wallet);
     }
 
-    function _addTrustPoints(address wallet, uint256 points) internal {
+    function addTrustPoints(address wallet, uint256 points) public onlyRole(ARCHITECT_ROLE) {
         uint256 oldScore = agents[wallet].trustScore;
         agents[wallet].trustScore += points;
         emit TrustScoreUpdated(wallet, oldScore, agents[wallet].trustScore);
     }
 
-    function _deductTrustPoints(address wallet, uint256 points) internal {
+    function deductTrustPoints(address wallet, uint256 points) public onlyRole(ARCHITECT_ROLE) {
         uint256 oldScore = agents[wallet].trustScore;
         if (agents[wallet].trustScore >= points) {
             agents[wallet].trustScore -= points;
@@ -114,10 +111,10 @@ contract vaultRegistry is AccessControl {
 
     function getTrustLevel(address wallet) external view returns (uint256) {
         uint256 score = agents[wallet].trustScore;
-        if (score >= 200) return 5;     
-        if (score >= 101) return 4;      
-        if (score >= 51)  return 3;      
-        if (score >= 21)  return 2;      
-        return 1;                        
+        if (score >= 200) return 5;
+        if (score >= 101) return 4;
+        if (score >= 51) return 3;
+        if (score >= 21) return 2;
+        return 1;
     }
 }
