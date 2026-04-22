@@ -1,56 +1,67 @@
-import hre from "hardhat";
 import fs from "fs";
+import { ethers } from "ethers";
+import { readFileSync } from "fs";
+const envFile = readFileSync(".env", "utf8");
+const envVars = Object.fromEntries(
+  envFile
+    .split("\n")
+    .filter(line => line.includes("="))
+    .map(line => [line.split("=")[0].trim(), line.split("=").slice(1).join("=").trim()])
+);
+const ALCHEMY_RPC_URL = envVars.ALCHEMY_RPC_URL;
+const PRIVATE_KEY = envVars.PRIVATE_KEY;
 
 async function main() {
 
-  const [deployer] = await hre.ethers.getSigners();
-  console.log("Deploying with wallet:", deployer.address);
+  const provider = new ethers.JsonRpcProvider(ALCHEMY_RPC_URL);
+  const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
-  const balance = await hre.ethers.provider.getBalance(deployer.address);
-  console.log("Wallet balance:", hre.ethers.formatEther(balance), "ETH");
+  console.log("Deploying with wallet:", wallet.address);
 
-  // Step 1: Deploy vaultRegistry 
-  console.log("\n Deploying vaultRegistry...");
-  const registryFactory = await hre.ethers.getContractFactory("vaultRegistry");
+  const balance = await provider.getBalance(wallet.address);
+  console.log("Balance:", ethers.formatEther(balance), "ETH");
+
+  console.log("\nDeploying vaultRegistry...");
+  const registryArtifact = JSON.parse(fs.readFileSync("./artifacts/contracts/vaultRegistry.sol/vaultRegistry.json", "utf8"));
+  const registryFactory = new ethers.ContractFactory(registryArtifact.abi, registryArtifact.bytecode, wallet);
   const registry = await registryFactory.deploy();
   await registry.waitForDeployment();
   const registryAddress = await registry.getAddress();
-  console.log("vaultRegistry deployed to:", registryAddress);
+  console.log("vaultRegistry:", registryAddress);
 
-  // Step 2: Deploy auditLog 
-  console.log("\n Deploying auditLog...");
-  const auditFactory = await hre.ethers.getContractFactory("auditLog");
+  console.log("\nDeploying auditLog...");
+  const auditArtifact = JSON.parse(fs.readFileSync("./artifacts/contracts/auditLog.sol/auditLog.json", "utf8"));
+  const auditFactory = new ethers.ContractFactory(auditArtifact.abi, auditArtifact.bytecode, wallet);
   const audit = await auditFactory.deploy();
   await audit.waitForDeployment();
   const auditAddress = await audit.getAddress();
-  console.log("auditLog deployed to:", auditAddress);
+  console.log("auditLog:", auditAddress);
 
-  // Step 3: Deploy chambers 
-  console.log("\n Deploying chambers...");
-  const chambersFactory = await hre.ethers.getContractFactory("chambers");
+  console.log("\nDeploying chambers...");
+  const chambersArtifact = JSON.parse(fs.readFileSync("./artifacts/contracts/chambers.sol/chambers.json", "utf8"));
+  const chambersFactory = new ethers.ContractFactory(chambersArtifact.abi, chambersArtifact.bytecode, wallet);
   const chambersContract = await chambersFactory.deploy(registryAddress, auditAddress);
   await chambersContract.waitForDeployment();
   const chambersAddress = await chambersContract.getAddress();
-  console.log("chambers deployed to:", chambersAddress);
+  console.log("chambers:", chambersAddress);
 
-  // Step 4: Deploy trustScore 
-  console.log("\n Deploying trustScore...");
-  const trustFactory = await hre.ethers.getContractFactory("trustScore");
+  console.log("\nDeploying trustScore...");
+  const trustArtifact = JSON.parse(fs.readFileSync("./artifacts/contracts/trustScore.sol/trustScore.json", "utf8"));
+  const trustFactory = new ethers.ContractFactory(trustArtifact.abi, trustArtifact.bytecode, wallet);
   const trust = await trustFactory.deploy(registryAddress);
   await trust.waitForDeployment();
   const trustAddress = await trust.getAddress();
-  console.log("trustScore deployed to:", trustAddress);
+  console.log("trustScore:", trustAddress);
 
-  // Step 5: Link contracts together 
-  console.log("\n Linking contracts...");
-  await audit.setAuthorizedContracts(registryAddress, chambersAddress);
-  console.log("auditLog authorized contracts set");
+  console.log("\nLinking contracts...");
+  const auditContract = new ethers.Contract(auditAddress, auditArtifact.abi, wallet);
+  await auditContract.setAuthorizedContracts(registryAddress, chambersAddress);
+  console.log("Contracts linked!");
 
-  // Step 6: Save all addresses to a JSON file 
   const deployments = {
     network: "sepolia",
     deployedAt: new Date().toISOString(),
-    deployer: deployer.address,
+    deployer: wallet.address,
     contracts: {
       vaultRegistry: registryAddress,
       auditLog: auditAddress,
@@ -59,14 +70,11 @@ async function main() {
     }
   };
 
-  fs.writeFileSync(
-    "./deployments.json",
-    JSON.stringify(deployments, null, 2)
-  );
+  fs.writeFileSync("./deployments.json", JSON.stringify(deployments, null, 2));
 
-  console.log("\n All contracts deployed successfully!");
-  console.log("Addresses saved to deployments.json");
-  console.log("\n Contract Addresses:");
+  console.log("\n✅ All contracts deployed!");
+  console.log("📄 Addresses saved to deployments.json");
+  console.log("\nContract Addresses:");
   console.log("  vaultRegistry:", registryAddress);
   console.log("  auditLog:     ", auditAddress);
   console.log("  chambers:     ", chambersAddress);
