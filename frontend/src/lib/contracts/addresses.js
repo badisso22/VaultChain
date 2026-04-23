@@ -1,0 +1,6 @@
+export const addresses = {
+  vaultRegistry: "0x2DA5B520cF970F6c30525eB2cFC6885BCB128a13",
+  auditLog: "0x3787C1D51fD64dfE577787f4C5cAb6832EC98114",
+  chambers: "0x1dEAC30Cd009ac92d8B9eBf18D978a9228d4558a",
+  trustScore: "0xE92B825B5A682c12d15997d528fC49144bfbE693",
+}
