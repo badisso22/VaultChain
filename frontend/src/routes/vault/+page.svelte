@@ -12,6 +12,7 @@
 
   let mounted = false;
   let hasRedirectedHome = false;
+  let currentLoadingAddress = "";
 
   // mark as mounted
   $effect(() => {
@@ -32,31 +33,36 @@
     }
   });
 
-  // load rooms when connected
+  // load rooms when connected - avoid re-running while loading same address
   $effect(() => {
     if (!browser || !mounted) return;
-    if ($connected && $userAddress) {
-      console.log("VAULT: loading rooms for", $userAddress);
+    if ($connected && $userAddress && currentLoadingAddress !== $userAddress) {
+      console.log("VAULT: loading rooms effect triggered for", $userAddress);
       loadMyRooms();
     }
   });
 
   async function loadMyRooms() {
     try {
+      console.log("loadMyRooms called for", $userAddress, "setting loading = true");
+      currentLoadingAddress = $userAddress;  // Mark that we're loading this address
       loading = true;
       errorMsg = "";
 
       const provider = new ethers.BrowserProvider(window.ethereum);
+      console.log("Provider created");
       const contract = new ethers.Contract(
         addresses.vaultRoom,
         vaultRoomABI.abi,
         provider
       );
+      console.log("Contract created, calling getMemberRooms");
 
       const roomIds = await contract.getMemberRooms($userAddress);
       console.log("Room IDs found:", roomIds);
 
       if (!roomIds || roomIds.length === 0) {
+        console.log("No room IDs, setting myRooms to empty array");
         myRooms = [];
         loading = false;
         return;
@@ -80,12 +86,17 @@
         }
       }
 
+      console.log("About to set myRooms, count:", rooms.length);
       myRooms = rooms;
       console.log("Rooms loaded:", myRooms);
+      console.log("myRooms length after assignment:", myRooms.length);
+      console.log("Setting loading to FALSE");
+      loading = false;
+      console.log("Loading is now:", loading);
     } catch (error) {
-      console.error("Failed to load rooms:", error);
+      console.error("CRITICAL ERROR in loadMyRooms:", error);
       errorMsg = "Failed to load rooms: " + (error?.message ?? String(error));
-    } finally {
+      console.log("Setting loading to FALSE (catch)");
       loading = false;
     }
   }
@@ -283,12 +294,15 @@
   }
 
   .room-card {
+    display: block;
     background: var(--bg);
     padding: 20px;
     cursor: pointer;
     position: relative;
-    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
     transition: background 0.2s;
+    text-decoration: none;
+    color: inherit;
   }
 
   .room-card:hover {
@@ -374,3 +388,74 @@
     color: rgba(226, 232, 240, 0.25);
   }
 </style>
+
+<div class="vault-page">
+  <div class="vault-content">
+    <div class="vault-header">
+      <div>
+        <h1 class="vault-title">MY VAULTS</h1>
+        <p class="vault-sub">YOUR SECURE ROOMS</p>
+      </div>
+      <div class="vault-actions">
+        <a href="/create" class="btn-primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          CREATE ROOM
+        </a>
+        <a href="/join" class="btn-secondary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14" />
+            <circle cx="9" cy="12" r="3" />
+            <path d="M6 12a6 6 0 0 1 12 0" />
+          </svg>
+          JOIN ROOM
+        </a>
+      </div>
+    </div>
+
+    {#if errorMsg}
+      <div class="error-msg">{errorMsg}</div>
+    {/if}
+
+    {#if loading}
+      <div class="loading-state">
+        <span>LOADING VAULTS</span>
+        <div class="loading-bar"></div>
+      </div>
+    {:else if myRooms.length === 0}
+      <div class="empty-state">
+        <div class="empty-title">NO VAULTS YET</div>
+        <div class="empty-sub">Create or join a room to get started</div>
+        <div class="empty-actions">
+          <a href="/create" class="btn-primary">CREATE</a>
+          <a href="/join" class="btn-secondary">JOIN</a>
+        </div>
+      </div>
+    {:else}
+      <div class="rooms-grid">
+        {#each myRooms as room}
+          <a href="/room/{room.id}" class="room-card">
+            <div class="room-corner"></div>
+            <div class="room-id">ROOM #{room.id}</div>
+            <div class="room-name">{room.name}</div>
+            <div class="room-divider"></div>
+            <div class="room-meta">
+              <span class="room-badge {room.creator === $userAddress ? 'creator' : 'member'}">
+                {room.creator === $userAddress ? 'CREATOR' : 'MEMBER'}
+              </span>
+              <span class="room-members">{room.memberCount} member{room.memberCount !== 1 ? 's' : ''}</span>
+            </div>
+            <div class="room-footer">
+              <span class="room-time">{timeAgo(room.createdAt)}</span>
+              {#if room.creatorOnlyUpload}
+                <span class="room-upload">Creator uploads only</span>
+              {/if}
+            </div>
+          </a>
+        {/each}
+      </div>
+    {/if}
+  </div>
+</div>
