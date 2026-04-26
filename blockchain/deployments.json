@@ -1,11 +1,9 @@
 {
   "network": "sepolia",
-  "deployedAt": "2026-04-22T23:18:25.594Z",
+  "deployedAt": "2026-04-26T08:50:39.571Z",
   "deployer": "0x4C4a197F4b792F7E2c42e80E3c902aDd3dc3FAD4",
   "contracts": {
-    "vaultRegistry": "0xa1a8bC61f6C51Ba9214eE752cFD695c4fd5145d0",
-    "auditLog": "0x030e9E0E9e4c60dd26b247aD8169318eaFF98c62",
-    "chambers": "0x2221354C1537c6046439C4F1eea3907df1eC9Af2",
-    "trustScore": "0x22f65D49B33A941F9688896a27Fc0a0A95515BFB"
+    "vaultRoom": "0xE76Cc700b6E66bff7671366ffaD15aC45f2c3DE3",
+    "fileRegistry": "0xD99E4386886b65B597dd541f0bECC7CC302b35bC"
   }
 }
