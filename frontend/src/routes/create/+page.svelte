@@ -14,10 +14,15 @@
   let createdRoomId = null;
   let error = "";
 
+  let mounted = false;
+
   $effect(() => {
-    if (!$connected) goto("/");
+    if (mounted && !$connected) goto("/");
   });
 
+  $effect(() => {
+    mounted = true;
+  });
   async function createRoom() {
     if (!roomName.trim()) {
       error = "Room name is required";
