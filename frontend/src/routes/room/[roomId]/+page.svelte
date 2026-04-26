@@ -20,8 +20,14 @@
   let uploadError = "";
   let verifyResults = {};
 
+  let mounted = false;
+
   $effect(() => {
-    if (!$connected) goto("/");
+    if (mounted && !$connected) goto("/");
+  });
+
+  $effect(() => {
+    mounted = true;
   });
 
   async function enterRoom() {
