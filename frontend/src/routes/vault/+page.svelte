@@ -6,12 +6,12 @@
   import { addresses } from "$lib/contracts/addresses.js";
   import vaultRoomABI from "$lib/contracts/vaultRoom.json";
 
-  let myRooms = [];
-  let loading = true;
-  let errorMsg = "";
+  let myRooms = $state([]);
+  let loading = $state(true);
+  let errorMsg = $state("");
 
-  let mounted = false;
-  let hasRedirectedHome = false;
+  let mounted = $state(false);
+  let hasRedirectedHome = $state(false);
   let currentLoadingAddress = "";
 
   // mark as mounted
@@ -115,7 +115,6 @@
 </script>
 
 <style>
-  /* your existing styles unchanged */
   .vault-page {
     min-height: calc(100vh - 65px);
     position: relative;
