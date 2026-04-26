@@ -3,24 +3,26 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { ethers } from "ethers";
+  import { NFTStorage } from "nft.storage"; // ✅ NEW
   import { addresses } from "$lib/contracts/addresses.js";
   import { hashKey } from "$lib/utils/keyGen.js";
   import vaultRoomABI from "$lib/contracts/vaultRoom.json";
   import fileRegistryABI from "$lib/contracts/fileRegistry.json";
 
   let roomId = $derived(Number($page.params.roomId));
-  let room = null;
-  let files = [];
-  let loading = true;
-  let uploading = false;
-  let canUpload = false;
-  let sessionKey = "";
-  let keyEntered = false;
-  let keyError = "";
-  let uploadError = "";
-  let verifyResults = {};
+  let room = $state(null);
+  let files = $state([]);
+  let loading = $state(true);
+  let uploading = $state(false);
+  let canUpload = $state(false);
+  let sessionKey = $state("");
+  let keyEntered = $state(false);
+  let keyError = $state("");
+  let uploadError = $state("");
+  let verifyResults = $state({});
+  let mounted = $state(false);
 
-  let mounted = false;
+  const NFT_STORAGE_TOKEN ="8a0e3935.7f696566d130426989fc29a79ebc3e1b";// ✅ PUT YOUR KEY HERE
 
   $effect(() => {
     if (mounted && !$connected) goto("/");
@@ -104,6 +106,7 @@
     }
   }
 
+  // ✅ FULLY FIXED UPLOAD FUNCTION (NFT.STORAGE)
   async function uploadFile(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -112,21 +115,18 @@
     uploadError = "";
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const ipfsRes = await fetch("https://api.web3.storage/upload", {
-        method: "POST",
-        headers: { Authorization: `Bearer YOUR_WEB3_STORAGE_TOKEN` },
-        body: formData,
+      // ✅ Create client
+      const client = new NFTStorage({
+        token: NFT_STORAGE_TOKEN,
       });
 
-      if (!ipfsRes.ok) throw new Error("IPFS upload failed");
-      const { cid } = await ipfsRes.json();
+      // ✅ Upload file → returns CID
+      const cid = await client.storeBlob(file);
 
       const keyHash = hashKey(sessionKey);
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
+
       const contract = new ethers.Contract(
         addresses.fileRegistry,
         fileRegistryABI.abi,
