@@ -45,7 +45,7 @@
         creatorOnly
       );
 
-      const receipt = await tx.wait();
+      await tx.wait();
 
       const roomCount = await contract.roomCount();
       createdRoomId = Number(roomCount);
@@ -110,7 +110,8 @@
         <div class="field">
           <label class="field-label">UPLOAD PERMISSION</label>
           <div class="toggle-group">
-            <div
+            <button
+              type="button"
               class="toggle-option {!creatorOnly ? 'active' : ''}"
               onclick={() => creatorOnly = false}
             >
@@ -119,8 +120,9 @@
                 <div class="toggle-title">Anyone in room</div>
                 <div class="toggle-desc">All members can upload files</div>
               </div>
-            </div>
-            <div
+            </button>
+            <button
+              type="button"
               class="toggle-option {creatorOnly ? 'active' : ''}"
               onclick={() => creatorOnly = true}
             >
@@ -129,7 +131,7 @@
                 <div class="toggle-title">Creator only</div>
                 <div class="toggle-desc">Only you can upload, others view</div>
               </div>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -179,7 +181,7 @@
 
         <div class="key-info">
           <div class="key-info-row">
-            <span class="key-info-label">What's stored on blockchain:</span>
+            <span class="key-info-label">Stored on blockchain:</span>
             <span class="key-info-val">keccak256 hash only</span>
           </div>
           <div class="key-info-row">
@@ -300,7 +302,12 @@
   text-align: right;
 }
 
-.toggle-group { display: flex; flex-direction: column; gap: 1px; background: rgba(0,200,180,0.08); }
+.toggle-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: rgba(0,200,180,0.08);
+}
 
 .toggle-option {
   display: flex;
@@ -310,10 +317,13 @@
   background: var(--bg);
   cursor: pointer;
   transition: background 0.2s;
+  width: 100%;
+  border: none;
+  text-align: left;
 }
 
 .toggle-option:hover { background: rgba(0,200,180,0.02); }
-.toggle-option.active { background: rgba(0,200,180,0.04); }
+.toggle-option.active { background: rgba(0,200,180,0.06); }
 
 .toggle-dot {
   width: 8px;
@@ -329,8 +339,16 @@
   border-color: var(--teal);
 }
 
-.toggle-title { font-size: 13px; color: #fff; margin-bottom: 2px; }
-.toggle-desc { font-size: 11px; color: rgba(226,232,240,0.35); }
+.toggle-title {
+  font-size: 13px;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+.toggle-desc {
+  font-size: 11px;
+  color: rgba(226,232,240,0.35);
+}
 
 .error-msg {
   font-family: var(--font-mono);
@@ -413,7 +431,6 @@
   border: 0.5px solid rgba(0,200,180,0.3);
   background: rgba(0,200,180,0.03);
   padding: 20px;
-  position: relative;
 }
 
 .key-label {
@@ -475,12 +492,5 @@
   font-family: var(--font-mono);
   font-size: 11px;
   color: rgba(0,200,180,0.7);
-}
-.toggle-option {
-  width: 100%;
-  text-align: left;
-  background: var(--bg);
-  border: none;
-  cursor: pointer;
 }
 </style>
