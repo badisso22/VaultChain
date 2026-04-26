@@ -6,15 +6,15 @@
   import { generateRoomKey, hashKey } from "$lib/utils/keyGen.js";
   import vaultRoomABI from "$lib/contracts/vaultRoom.json";
 
-  let roomName = "";
-  let creatorOnly = false;
-  let loading = false;
-  let generatedKey = "";
-  let roomCreated = false;
-  let createdRoomId = null;
-  let error = "";
+  let roomName = $state("");
+  let creatorOnly = $state(false);
+  let loading = $state(false);
+  let generatedKey = $state("");
+  let roomCreated = $state(false);
+  let createdRoomId = $state(null);
+  let error = $state("");
 
-  let mounted = false;
+  let mounted = $state(false);
 
   $effect(() => {
     if (mounted && !$connected) goto("/");
