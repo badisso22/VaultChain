@@ -29,6 +29,7 @@
 		"@wagmi/connectors": "^8.0.4",
 		"@wagmi/core": "^3.4.5",
 		"ethers": "^6.16.0",
+		"nft.storage": "^7.2.0",
 		"viem": "^2.48.4"
 	}
 }
