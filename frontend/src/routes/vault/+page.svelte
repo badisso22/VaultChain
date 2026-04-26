@@ -1,5 +1,6 @@
 <script>
   import { connected, userAddress } from "$lib/stores/wallet.js";
+  import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
   import { ethers } from "ethers";
   import { addresses } from "$lib/contracts/addresses.js";
@@ -9,12 +10,33 @@
   let loading = true;
   let errorMsg = "";
 
+  let mounted = false;
+  let hasRedirectedHome = false;
+
+  // mark as mounted
   $effect(() => {
-    if (!$connected) goto("/");
+    if (!browser) return;
+    mounted = true;
   });
 
+  // redirect if not connected
   $effect(() => {
+    if (!browser || !mounted) return;
+
+    console.log("VAULT effect (auth): connected =", $connected, "userAddress =", $userAddress);
+
+    if (!$connected && !hasRedirectedHome) {
+      hasRedirectedHome = true;
+      console.log("VAULT: not connected, going /");
+      goto("/");
+    }
+  });
+
+  // load rooms when connected
+  $effect(() => {
+    if (!browser || !mounted) return;
     if ($connected && $userAddress) {
+      console.log("VAULT: loading rooms for", $userAddress);
       loadMyRooms();
     }
   });
@@ -34,7 +56,7 @@
       const roomIds = await contract.getMemberRooms($userAddress);
       console.log("Room IDs found:", roomIds);
 
-      if (roomIds.length === 0) {
+      if (!roomIds || roomIds.length === 0) {
         myRooms = [];
         loading = false;
         return;
@@ -46,12 +68,12 @@
           const id = Number(roomIds[i]);
           const room = await contract.getRoom(id);
           rooms.push({
-            id: id,
+            id,
             name: room.name,
             creator: room.creator,
             memberCount: Number(room.memberCount),
             creatorOnlyUpload: room.creatorOnlyUpload,
-            createdAt: Number(room.createdAt),
+            createdAt: Number(room.createdAt)
           });
         } catch (e) {
           console.error("Failed to load room", Number(roomIds[i]), e);
@@ -60,10 +82,9 @@
 
       myRooms = rooms;
       console.log("Rooms loaded:", myRooms);
-
     } catch (error) {
       console.error("Failed to load rooms:", error);
-      errorMsg = "Failed to load rooms: " + error.message;
+      errorMsg = "Failed to load rooms: " + (error?.message ?? String(error));
     } finally {
       loading = false;
     }
@@ -82,334 +103,274 @@
   }
 </script>
 
-<div class="vault-page">
-  <div class="grid-bg"></div>
-  <div class="glow-bg"></div>
-
-  <div class="vault-content">
-
-    <div class="vault-header">
-      <div>
-        <h1 class="vault-title">MY VAULT</h1>
-        <p class="vault-sub">{shortAddress($userAddress)}</p>
-      </div>
-      <div class="vault-actions">
-        <button class="btn-secondary" onclick={() => goto("/join")}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-            <polyline points="10 17 15 12 10 7"/>
-            <line x1="15" y1="12" x2="3" y2="12"/>
-          </svg>
-          JOIN ROOM
-        </button>
-        <button class="btn-primary" onclick={() => goto("/create")}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          CREATE ROOM
-        </button>
-      </div>
-    </div>
-
-    {#if errorMsg}
-      <div class="error-msg">{errorMsg}</div>
-    {/if}
-
-    {#if loading}
-      <div class="loading-state">
-        <div class="loading-bar"></div>
-        <p>Loading your rooms from blockchain...</p>
-      </div>
-    {:else if myRooms.length === 0}
-      <div class="empty-state">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(0,200,180,0.3)" stroke-width="0.75">
-          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-        </svg>
-        <p class="empty-title">No rooms yet</p>
-        <p class="empty-sub">Create a vault room or join one with a key</p>
-        <div class="empty-actions">
-          <button class="btn-primary" onclick={() => goto("/create")}>CREATE ROOM</button>
-          <button class="btn-secondary" onclick={() => goto("/join")}>JOIN ROOM</button>
-        </div>
-      </div>
-    {:else}
-      <div class="rooms-grid">
-        {#each myRooms as room}
-          <div
-            class="room-card"
-            onclick={() => goto(`/room/${room.id}`)}
-            role="button"
-            tabindex="0"
-            onkeydown={(e) => e.key === 'Enter' && goto(`/room/${room.id}`)}
-          >
-            <div class="room-corner"></div>
-            <div class="room-id">VAULT #{room.id.toString().padStart(4, '0')}</div>
-            <div class="room-name">{room.name}</div>
-            <div class="room-divider"></div>
-            <div class="room-meta">
-              <span class="room-badge {room.creator.toLowerCase() === $userAddress.toLowerCase() ? 'creator' : 'member'}">
-                {room.creator.toLowerCase() === $userAddress.toLowerCase() ? 'CREATOR' : 'MEMBER'}
-              </span>
-              <span class="room-members">{room.memberCount} members</span>
-            </div>
-            <div class="room-footer">
-              <span class="room-time">{timeAgo(room.createdAt)}</span>
-              <span class="room-upload">{room.creatorOnlyUpload ? 'Creator uploads only' : 'Open uploads'}</span>
-            </div>
-          </div>
-        {/each}
-      </div>
-    {/if}
-
-  </div>
-</div>
-
 <style>
-.vault-page {
-  min-height: calc(100vh - 65px);
-  position: relative;
-  overflow: hidden;
-}
+  /* your existing styles unchanged */
+  .vault-page {
+    min-height: calc(100vh - 65px);
+    position: relative;
+    overflow: hidden;
+  }
 
-.vault-content {
-  position: relative;
-  z-index: 5;
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 48px 40px;
-}
+  .vault-content {
+    position: relative;
+    z-index: 5;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 48px 40px;
+  }
 
-.vault-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 40px;
-}
+  .vault-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 40px;
+  }
 
-.vault-title {
-  font-family: var(--font-mono);
-  font-size: 28px;
-  letter-spacing: 4px;
-  color: #fff;
-  margin-bottom: 4px;
-}
+  .vault-title {
+    font-family: var(--font-mono);
+    font-size: 28px;
+    letter-spacing: 4px;
+    color: #fff;
+    margin-bottom: 4px;
+  }
 
-.vault-sub {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: rgba(0,200,180,0.5);
-  letter-spacing: 2px;
-}
+  .vault-sub {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: rgba(0, 200, 180, 0.5);
+    letter-spacing: 2px;
+  }
 
-.vault-actions {
-  display: flex;
-  gap: 12px;
-}
+  .vault-actions {
+    display: flex;
+    gap: 12px;
+  }
 
-.btn-primary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--bg);
-  background: var(--teal);
-  border: none;
-  padding: 10px 20px;
-  cursor: pointer;
-  letter-spacing: 1px;
-  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
-  transition: opacity 0.2s;
-}
+  .btn-primary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--bg);
+    background: var(--teal);
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    clip-path: polygon(
+      0 0,
+      calc(100% - 7px) 0,
+      100% 7px,
+      100% 100%,
+      7px 100%,
+      0 calc(100% - 7px)
+    );
+    transition: opacity 0.2s;
+  }
 
-.btn-primary:hover { opacity: 0.85; }
+  .btn-primary:hover {
+    opacity: 0.85;
+  }
 
-.btn-secondary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--teal);
-  background: transparent;
-  border: 0.5px solid rgba(0,200,180,0.3);
-  padding: 10px 20px;
-  cursor: pointer;
-  letter-spacing: 1px;
-  transition: all 0.2s;
-}
+  .btn-secondary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--teal);
+    background: transparent;
+    border: 0.5px solid rgba(0, 200, 180, 0.3);
+    padding: 10px 20px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+  }
 
-.btn-secondary:hover { background: rgba(0,200,180,0.05); }
+  .btn-secondary:hover {
+    background: rgba(0, 200, 180, 0.05);
+  }
 
-.error-msg {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: rgba(220,80,80,0.8);
-  border: 0.5px solid rgba(220,80,80,0.2);
-  padding: 10px 14px;
-  margin-bottom: 20px;
-}
+  .error-msg {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: rgba(220, 80, 80, 0.8);
+    border: 0.5px solid rgba(220, 80, 80, 0.2);
+    padding: 10px 14px;
+    margin-bottom: 20px;
+  }
 
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 60px;
-  color: rgba(226,232,240,0.3);
-  font-size: 13px;
-  font-family: var(--font-mono);
-  letter-spacing: 1px;
-}
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 60px;
+    color: rgba(226, 232, 240, 0.3);
+    font-size: 13px;
+    font-family: var(--font-mono);
+    letter-spacing: 1px;
+  }
 
-.loading-bar {
-  width: 200px;
-  height: 1px;
-  background: rgba(0,200,180,0.1);
-  position: relative;
-  overflow: hidden;
-}
+  .loading-bar {
+    width: 200px;
+    height: 1px;
+    background: rgba(0, 200, 180, 0.1);
+    position: relative;
+    overflow: hidden;
+  }
 
-.loading-bar::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -50%;
-  width: 50%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(0,200,180,0.6), transparent);
-  animation: loadingSlide 1.5s ease-in-out infinite;
-}
+  .loading-bar::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -50%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(0, 200, 180, 0.6),
+      transparent
+    );
+    animation: loadingSlide 1.5s ease-in-out infinite;
+  }
 
-@keyframes loadingSlide {
-  from { left: -50%; }
-  to { left: 150%; }
-}
+  @keyframes loadingSlide {
+    from {
+      left: -50%;
+    }
+    to {
+      left: 150%;
+    }
+  }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 80px 40px;
-  text-align: center;
-}
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 80px 40px;
+    text-align: center;
+  }
 
-.empty-title {
-  font-size: 16px;
-  color: rgba(226,232,240,0.5);
-  font-weight: 500;
-}
+  .empty-title {
+    font-size: 16px;
+    color: rgba(226, 232, 240, 0.5);
+    font-weight: 500;
+  }
 
-.empty-sub {
-  font-size: 13px;
-  color: rgba(226,232,240,0.25);
-  margin-bottom: 8px;
-}
+  .empty-sub {
+    font-size: 13px;
+    color: rgba(226, 232, 240, 0.25);
+    margin-bottom: 8px;
+  }
 
-.empty-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 8px;
-}
+  .empty-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+  }
 
-.rooms-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1px;
-  background: rgba(0,200,180,0.08);
-}
+  .rooms-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1px;
+    background: rgba(0, 200, 180, 0.08);
+  }
 
-.room-card {
-  background: var(--bg);
-  padding: 20px;
-  cursor: pointer;
-  position: relative;
-  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
-  transition: background 0.2s;
-}
+  .room-card {
+    background: var(--bg);
+    padding: 20px;
+    cursor: pointer;
+    position: relative;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+    transition: background 0.2s;
+  }
 
-.room-card:hover { background: rgba(0,200,180,0.03); }
+  .room-card:hover {
+    background: rgba(0, 200, 180, 0.03);
+  }
 
-.room-corner {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 8px;
-  height: 8px;
-  border-top: 0.5px solid rgba(0,200,180,0.3);
-  border-right: 0.5px solid rgba(0,200,180,0.3);
-}
+  .room-corner {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 8px;
+    height: 8px;
+    border-top: 0.5px solid rgba(0, 200, 180, 0.3);
+    border-right: 0.5px solid rgba(0, 200, 180, 0.3);
+  }
 
-.room-id {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: rgba(0,200,180,0.4);
-  letter-spacing: 2px;
-  margin-bottom: 6px;
-}
+  .room-id {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: rgba(0, 200, 180, 0.4);
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+  }
 
-.room-name {
-  font-size: 16px;
-  font-weight: 500;
-  color: #fff;
-  margin-bottom: 12px;
-}
+  .room-name {
+    font-size: 16px;
+    font-weight: 500;
+    color: #fff;
+    margin-bottom: 12px;
+  }
 
-.room-divider {
-  height: 0.5px;
-  background: rgba(0,200,180,0.08);
-  margin-bottom: 10px;
-}
+  .room-divider {
+    height: 0.5px;
+    background: rgba(0, 200, 180, 0.08);
+    margin-bottom: 10px;
+  }
 
-.room-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
+  .room-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
 
-.room-badge {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 1.5px;
-  padding: 3px 8px;
-  border: 0.5px solid;
-}
+  .room-badge {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    padding: 3px 8px;
+    border: 0.5px solid;
+  }
 
-.room-badge.creator {
-  color: #00c8b4;
-  border-color: rgba(0,200,180,0.3);
-  background: rgba(0,200,180,0.05);
-}
+  .room-badge.creator {
+    color: #00c8b4;
+    border-color: rgba(0, 200, 180, 0.3);
+    background: rgba(0, 200, 180, 0.05);
+  }
 
-.room-badge.member {
-  color: rgba(226,232,240,0.4);
-  border-color: rgba(226,232,240,0.1);
-}
+  .room-badge.member {
+    color: rgba(226, 232, 240, 0.4);
+    border-color: rgba(226, 232, 240, 0.1);
+  }
 
-.room-members {
-  font-size: 11px;
-  color: rgba(226,232,240,0.3);
-}
+  .room-members {
+    font-size: 11px;
+    color: rgba(226, 232, 240, 0.3);
+  }
 
-.room-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+  .room-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
 
-.room-time {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: rgba(226,232,240,0.2);
-}
+  .room-time {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: rgba(226, 232, 240, 0.2);
+  }
 
-.room-upload {
-  font-size: 10px;
-  color: rgba(226,232,240,0.25);
-}
+  .room-upload {
+    font-size: 10px;
+    color: rgba(226, 232, 240, 0.25);
+  }
 </style>
