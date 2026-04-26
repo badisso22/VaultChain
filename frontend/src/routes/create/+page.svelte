@@ -47,22 +47,17 @@
 
       const receipt = await tx.wait();
 
-      const event = receipt.logs
-        .map(log => {
-          try { return contract.interface.parseLog(log); }
-          catch { return null; }
-        })
-        .find(e => e && e.name === "roomCreated");
-
-      createdRoomId = event ? Number(event.args.roomId) : null;
+      const roomCount = await contract.roomCount();
+      createdRoomId = Number(roomCount);
       generatedKey = rawKey;
       roomCreated = true;
 
     } catch (e) {
+      console.error("Full error:", e);
       if (e.code === 4001) {
         error = "Transaction rejected";
       } else {
-        error = "Failed to create room: " + e.message;
+        error = "Failed: " + (e.reason || e.message);
       }
     } finally {
       loading = false;
