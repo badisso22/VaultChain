@@ -44,18 +44,41 @@
         signer
       );
 
+      console.log("Creating room:", roomName, "creatorOnly:", creatorOnly);
+      
       const tx = await contract.createRoom(
         roomName.trim(),
         keyHash,
         creatorOnly
       );
 
-      await tx.wait();
+      console.log("Transaction sent:", tx.hash);
+      const receipt = await tx.wait();
+      console.log("Transaction confirmed:", receipt.hash);
 
-      const roomCount = await contract.roomCount();
-      createdRoomId = Number(roomCount);
+      // Try to get the new room ID from the contract
+      // The room ID should be roomCount after creation (assuming 1-based indexing)
+      let roomCount = await contract.roomCount();
+      roomCount = Number(roomCount);
+      
+      console.log("Room count after creation:", roomCount);
+      createdRoomId = roomCount;
+      
+      // Verify the room was created by checking if it exists
+      try {
+        const newRoom = await contract.getRoom(createdRoomId);
+        console.log("Room verified:", newRoom);
+      } catch (e) {
+        console.error("Failed to verify room - trying ID -1:", e);
+        createdRoomId = roomCount - 1;
+        const newRoom = await contract.getRoom(createdRoomId);
+        console.log("Room verified (adjusted ID):", newRoom);
+      }
+      
       generatedKey = rawKey;
+      console.log("Setting roomCreated to true, key:", generatedKey);
       roomCreated = true;
+      console.log("roomCreated is now:", roomCreated);
 
     } catch (e) {
       console.error("Full error:", e);
@@ -76,6 +99,16 @@
   function enterRoom() {
     goto(`/room/${createdRoomId}`);
   }
+
+  function setPermissionAny() {
+    console.log("Setting to Anyone in room");
+    creatorOnly = false;
+  }
+
+  function setPermissionCreator() {
+    console.log("Setting to Creator only");
+    creatorOnly = true;
+  }
 </script>
 
 <div class="create-page">
@@ -86,7 +119,7 @@
 
     {#if !roomCreated}
       <div class="page-header">
-        <button class="back-btn" onclick={() => goto("/vault")}>
+        <button class="back-btn" on:click={() => goto("/vault")}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <line x1="19" y1="12" x2="5" y2="12"/>
             <polyline points="12 19 5 12 12 5"/>
@@ -118,7 +151,7 @@
             <button
               type="button"
               class="toggle-option {!creatorOnly ? 'active' : ''}"
-              onclick={() => creatorOnly = false}
+              on:click={setPermissionAny}
             >
               <div class="toggle-dot"></div>
               <div>
@@ -129,7 +162,7 @@
             <button
               type="button"
               class="toggle-option {creatorOnly ? 'active' : ''}"
-              onclick={() => creatorOnly = true}
+              on:click={setPermissionCreator}
             >
               <div class="toggle-dot"></div>
               <div>
@@ -146,7 +179,7 @@
 
         <button
           class="submit-btn"
-          onclick={createRoom}
+          on:click={createRoom}
           disabled={loading}
         >
           {#if loading}
@@ -175,7 +208,7 @@
         <div class="key-box">
           <div class="key-label">YOUR ROOM KEY</div>
           <div class="key-value">{generatedKey}</div>
-          <button class="key-copy" onclick={copyKey}>
+          <button class="key-copy" on:click={copyKey}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <rect x="9" y="9" width="13" height="13" rx="2"/>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -199,7 +232,7 @@
           </div>
         </div>
 
-        <button class="submit-btn" onclick={enterRoom}>
+        <button class="submit-btn" on:click={enterRoom}>
           ENTER ROOM
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="5" y1="12" x2="19" y2="12"/>
