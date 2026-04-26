@@ -1,11 +1,7 @@
 import { writable } from "svelte/store";
-import { createPublicClient, createWalletClient, custom, http } from "viem";
-import { sepolia } from "viem/chains";
 
 export const connected = writable(false);
 export const userAddress = writable("");
-export const userRole = writable(""); 
-export const isRegistered = writable(false);
 
 export async function connectWallet() {
   try {
@@ -17,7 +13,6 @@ export async function connectWallet() {
     const accounts = await window.ethereum.request({
       method: "eth_requestAccounts"
     });
-
     const chainId = await window.ethereum.request({
       method: "eth_chainId"
     });
@@ -30,7 +25,13 @@ export async function connectWallet() {
     userAddress.set(accounts[0]);
     connected.set(true);
 
-    console.log("Connected:", accounts[0]);
+    window.ethereum.on("accountsChanged", (accounts) => {
+      if (accounts.length === 0) {
+        disconnectWallet();
+      } else {
+        userAddress.set(accounts[0]);
+      }
+    });
 
   } catch (error) {
     console.error("Connection failed:", error);
@@ -40,6 +41,4 @@ export async function connectWallet() {
 export function disconnectWallet() {
   connected.set(false);
   userAddress.set("");
-  userRole.set("");
-  isRegistered.set(false);
 }
