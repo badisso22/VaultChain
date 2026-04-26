@@ -318,18 +318,26 @@
                 </small>
               </div>
 
-              <div>
+              <div class="file-actions">
                 {#if verifyResults[file.id] === true}
-                  VERIFIED
+                  <div class="verify-status verified">
+                    <span class="status-icon">✓</span>
+                    VERIFIED
+                  </div>
                 {:else if verifyResults[file.id] === false}
-                  TAMPERED
+                  <div class="verify-status tampered">
+                    <span class="status-icon">⚠</span>
+                    TAMPERED
+                  </div>
                 {:else}
-                  <button onclick={() => verifyFile(file)}>
+                  <button class="btn-verify" onclick={() => verifyFile(file)}>
+                    <span class="btn-icon">🔐</span>
                     VERIFY
                   </button>
                 {/if}
 
-                <button onclick={() => openFilePreview(file)}>
+                <button class="btn-preview" onclick={() => openFilePreview(file)}>
+                  <span class="btn-icon">👁</span>
                   PREVIEW
                 </button>
               </div>
@@ -638,8 +646,178 @@
 .file-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-shrink: 0;
+}
+
+.file-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* VERIFY Button */
+.btn-verify {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  font-weight: 600;
+  color: var(--teal);
+  background: linear-gradient(135deg, rgba(0,200,180,0.1), rgba(0,200,180,0.05));
+  border: 1px solid rgba(0,200,180,0.3);
+  padding: 8px 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-verify::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,200,180,0.15);
+  transition: left 0.3s;
+  z-index: -1;
+}
+
+.btn-verify:hover::before {
+  left: 0;
+}
+
+.btn-verify:hover {
+  background: linear-gradient(135deg, rgba(0,200,180,0.2), rgba(0,200,180,0.12));
+  border-color: rgba(0,200,180,0.6);
+  box-shadow: 0 0 16px rgba(0,200,180,0.25), inset 0 0 8px rgba(0,200,180,0.1);
+  transform: translateY(-2px);
+}
+
+.btn-verify:active {
+  transform: translateY(0);
+  box-shadow: 0 0 8px rgba(0,200,180,0.15);
+}
+
+/* PREVIEW Button */
+.btn-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  font-weight: 600;
+  color: rgba(226,232,240,0.9);
+  background: linear-gradient(135deg, rgba(100,150,255,0.12), rgba(100,200,255,0.08));
+  border: 1px solid rgba(100,150,255,0.3);
+  padding: 8px 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-preview::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: rgba(100,200,255,0.2);
+  transition: left 0.3s;
+  z-index: -1;
+}
+
+.btn-preview:hover::before {
+  left: 0;
+}
+
+.btn-preview:hover {
+  background: linear-gradient(135deg, rgba(100,200,255,0.18), rgba(100,200,255,0.12));
+  border-color: rgba(100,200,255,0.6);
+  box-shadow: 0 0 16px rgba(100,150,255,0.25), inset 0 0 8px rgba(100,200,255,0.1);
+  transform: translateY(-2px);
+  color: #fff;
+}
+
+.btn-preview:active {
+  transform: translateY(0);
+  box-shadow: 0 0 8px rgba(100,150,255,0.15);
+}
+
+.btn-icon {
+  display: inline-block;
+  font-size: 13px;
+}
+
+/* Verify Status Badges */
+.verify-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 4px;
+  border: 1px solid;
+}
+
+.verify-status.verified {
+  color: #00c8b4;
+  background: linear-gradient(135deg, rgba(0,200,180,0.15), rgba(0,200,180,0.08));
+  border-color: rgba(0,200,180,0.4);
+  box-shadow: 0 0 12px rgba(0,200,180,0.15);
+  animation: slideInVerified 0.4s ease-out;
+}
+
+.verify-status.tampered {
+  color: #ff6b6b;
+  background: linear-gradient(135deg, rgba(255,107,107,0.15), rgba(255,107,107,0.08));
+  border-color: rgba(255,107,107,0.4);
+  box-shadow: 0 0 12px rgba(255,107,107,0.15);
+  animation: slideInTampered 0.4s ease-out;
+}
+
+.status-icon {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+@keyframes slideInVerified {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInTampered {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .verify-btn {
@@ -680,32 +858,4 @@
   border: 0.5px solid rgba(220,80,80,0.3);
   background: rgba(220,80,80,0.05);
 }
-
-.download-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: 0.5px solid rgba(0,200,180,0.15);
-  color: rgba(0,200,180,0.5);
-  transition: all 0.2s;
-  text-decoration: none;
-}
-
-.download-btn:hover {
-  background: rgba(0,200,180,0.05);
-  color: #00c8b4;
-}
-
-.btn-spinner-dark {
-  width: 12px;
-  height: 12px;
-  border: 1.5px solid rgba(5,8,16,0.3);
-  border-top-color: var(--bg);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
 </style>
