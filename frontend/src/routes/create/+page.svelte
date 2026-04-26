@@ -6,15 +6,15 @@
   import { generateRoomKey, hashKey } from "$lib/utils/keyGen.js";
   import vaultRoomABI from "$lib/contracts/vaultRoom.json";
 
-  let roomName = "";
-  let creatorOnly = false;
-  let loading = false;
-  let generatedKey = "";
-  let roomCreated = false;
-  let createdRoomId = null;
-  let error = "";
+  let roomName = $state("");
+  let creatorOnly = $state(false);
+  let loading = $state(false);
+  let generatedKey = $state("");
+  let roomCreated = $state(false);
+  let createdRoomId = $state(0);
+  let error = $state("");
 
-  let mounted = false;
+  let mounted = $state(false);
 
   $effect(() => {
     if (mounted && !$connected) goto("/");
@@ -45,7 +45,7 @@
       );
 
       console.log("Creating room:", roomName, "creatorOnly:", creatorOnly);
-      
+
       const tx = await contract.createRoom(
         roomName.trim(),
         keyHash,
@@ -60,10 +60,10 @@
       // The room ID should be roomCount after creation (assuming 1-based indexing)
       let roomCount = await contract.roomCount();
       roomCount = Number(roomCount);
-      
+
       console.log("Room count after creation:", roomCount);
       createdRoomId = roomCount;
-      
+
       // Verify the room was created by checking if it exists
       try {
         const newRoom = await contract.getRoom(createdRoomId);
@@ -74,7 +74,7 @@
         const newRoom = await contract.getRoom(createdRoomId);
         console.log("Room verified (adjusted ID):", newRoom);
       }
-      
+
       generatedKey = rawKey;
       console.log("Setting roomCreated to true, key:", generatedKey);
       roomCreated = true;
@@ -119,7 +119,7 @@
 
     {#if !roomCreated}
       <div class="page-header">
-        <button class="back-btn" on:click={() => goto("/vault")}>
+        <button class="back-btn" onclick={() => goto("/vault")}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <line x1="19" y1="12" x2="5" y2="12"/>
             <polyline points="12 19 5 12 12 5"/>
@@ -151,7 +151,7 @@
             <button
               type="button"
               class="toggle-option {!creatorOnly ? 'active' : ''}"
-              on:click={setPermissionAny}
+              onclick={setPermissionAny}
             >
               <div class="toggle-dot"></div>
               <div>
@@ -162,7 +162,7 @@
             <button
               type="button"
               class="toggle-option {creatorOnly ? 'active' : ''}"
-              on:click={setPermissionCreator}
+              onclick={setPermissionCreator}
             >
               <div class="toggle-dot"></div>
               <div>
@@ -179,7 +179,7 @@
 
         <button
           class="submit-btn"
-          on:click={createRoom}
+          onclick={createRoom}
           disabled={loading}
         >
           {#if loading}
@@ -208,7 +208,7 @@
         <div class="key-box">
           <div class="key-label">YOUR ROOM KEY</div>
           <div class="key-value">{generatedKey}</div>
-          <button class="key-copy" on:click={copyKey}>
+          <button class="key-copy" onclick={copyKey}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <rect x="9" y="9" width="13" height="13" rx="2"/>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -232,7 +232,7 @@
           </div>
         </div>
 
-        <button class="submit-btn" on:click={enterRoom}>
+        <button class="submit-btn" onclick={enterRoom}>
           ENTER ROOM
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="5" y1="12" x2="19" y2="12"/>

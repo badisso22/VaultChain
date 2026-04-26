@@ -4,11 +4,11 @@
 
   const ALCHEMY_RPC_URL = import.meta.env.VITE_ALCHEMY_RPC_URL;
 
-  let blocks = [];
-  let provider;
-  let interval;
-  let totalBlocks = 0;
-  let lastBlockTime = null;
+  let blocks = $state([]);
+  let provider = $state();
+  let interval = $state();
+  let totalBlocks = $state(0);
+  let lastBlockTime = $state(null);
 
   function shortHash(hash) {
     if (!hash) return "";
@@ -27,7 +27,7 @@
         console.warn("VITE_ALCHEMY_RPC_URL is not set. BlockVisualizer will not fetch data.");
         return;
       }
-      
+
       provider = new ethers.JsonRpcProvider(ALCHEMY_RPC_URL);
       const latest = await provider.getBlockNumber();
       totalBlocks = latest;

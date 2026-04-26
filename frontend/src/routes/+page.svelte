@@ -4,7 +4,7 @@
   import { goto } from "$app/navigation";
   import BlockVisualizer from "$lib/components/BlockVisualizer.svelte";
 
-  let hasRedirected = false;
+  let hasRedirected = $state(false);
 
   $effect(() => {
     if (!browser) return;

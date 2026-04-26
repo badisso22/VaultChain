@@ -7,18 +7,22 @@
   import { hashKey } from "$lib/utils/keyGen.js";
   import vaultRoomABI from "$lib/contracts/vaultRoom.json";
   import fileRegistryABI from "$lib/contracts/fileRegistry.json";
+  import ImageModal from "$lib/components/ImageModal.svelte";
 
   let roomId = $derived(Number($page.params.roomId));
-  let room = null;
-  let files = [];
-  let loading = true;
-  let uploading = false;
-  let canUpload = false;
-  let sessionKey = "";
-  let keyEntered = false;
-  let keyError = "";
-  let uploadError = "";
-  let verifyResults = {};
+  let room = $state(null);
+  let files = $state([]);
+  let loading = $state(true);
+  let uploading = $state(false);
+  let canUpload = $state(false);
+  let sessionKey = $state("");
+  let keyEntered = $state(false);
+  let keyError = $state("");
+  let uploadError = $state("");
+  let verifyResults = $state({});
+  let modalOpen = $state(false);
+  let selectedFileUrl = $state("");
+  let selectedFileName = $state("");
 
   let mounted = false;
 
@@ -30,6 +34,21 @@
     mounted = true;
   });
 
+  async function uploadToLighthouse(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!res.ok) throw new Error("Upload failed");
+
+    const data = await res.json();
+    return data.cid;
+  }
+
   async function enterRoom() {
     if (!sessionKey.trim()) {
       keyError = "Please enter the room key";
@@ -37,21 +56,30 @@
     }
 
     try {
+      if (!$userAddress) {
+        keyError = "Wallet not connected";
+        return;
+      }
+
       const keyHash = hashKey(sessionKey.trim());
+
       const provider = new ethers.BrowserProvider(window.ethereum);
-      const contract = new ethers.Contract(
+      const signer = await provider.getSigner();
+
+      const vaultContract = new ethers.Contract(
         addresses.vaultRoom,
         vaultRoomABI.abi,
-        provider
+        signer
       );
 
-      const isMember = await contract.isMember(roomId, $userAddress);
+      const isMember = await vaultContract.isMember(roomId, $userAddress);
       if (!isMember) {
         keyError = "You are not a member of this room";
         return;
       }
 
-      const roomData = await contract.getRoom(roomId);
+      const roomData = await vaultContract.getRoom(roomId);
+
       if (roomData.keyHash !== keyHash) {
         keyError = "Invalid key";
         return;
@@ -66,8 +94,7 @@
         createdAt: Number(roomData.createdAt),
       };
 
-      const uploadCheck = await contract.canUpload(roomId, $userAddress);
-      canUpload = uploadCheck;
+      canUpload = await vaultContract.canUpload(roomId, $userAddress);
 
       await loadFiles(keyHash);
       keyEntered = true;
@@ -80,15 +107,19 @@
   async function loadFiles(keyHash) {
     try {
       loading = true;
+
       const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner(); // 🔥 FIX IS HERE
+
       const contract = new ethers.Contract(
         addresses.fileRegistry,
         fileRegistryABI.abi,
-        provider
+        signer
       );
 
       const rawFiles = await contract.getFiles(roomId, keyHash);
-      files = rawFiles.map(f => ({
+
+      files = rawFiles.map((f) => ({
         id: Number(f.id),
         uploader: f.uploader,
         ipfsCID: f.ipfsCID,
@@ -97,6 +128,7 @@
         uploadedAt: Number(f.uploadedAt),
         blockNumber: Number(f.blockNumber),
       }));
+
     } catch (e) {
       console.error("Failed to load files:", e);
     } finally {
@@ -112,21 +144,13 @@
     uploadError = "";
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const ipfsRes = await fetch("https://api.web3.storage/upload", {
-        method: "POST",
-        headers: { Authorization: `Bearer YOUR_WEB3_STORAGE_TOKEN` },
-        body: formData,
-      });
-
-      if (!ipfsRes.ok) throw new Error("IPFS upload failed");
-      const { cid } = await ipfsRes.json();
+      const cid = await uploadToLighthouse(file);
 
       const keyHash = hashKey(sessionKey);
+
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
+
       const contract = new ethers.Contract(
         addresses.fileRegistry,
         fileRegistryABI.abi,
@@ -158,14 +182,24 @@
   async function verifyFile(file) {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
+
       const contract = new ethers.Contract(
         addresses.fileRegistry,
         fileRegistryABI.abi,
         provider
       );
 
-      const result = await contract.verifyFile(roomId, file.id, file.ipfsCID);
-      verifyResults = { ...verifyResults, [file.id]: result };
+      const result = await contract.verifyFile(
+        roomId,
+        file.id,
+        file.ipfsCID
+      );
+
+      verifyResults = {
+        ...verifyResults,
+        [file.id]: result,
+      };
+
     } catch (e) {
       console.error("Verify failed:", e);
     }
@@ -188,6 +222,12 @@
     if (s < 86400) return Math.floor(s / 3600) + "h ago";
     return Math.floor(s / 86400) + "d ago";
   }
+
+  function openFilePreview(file) {
+    selectedFileUrl = "https://gateway.lighthouse.storage/ipfs/" + file.ipfsCID;
+    selectedFileName = file.fileName;
+    modalOpen = true;
+  }
 </script>
 
 <div class="room-page">
@@ -198,21 +238,18 @@
 
     {#if !keyEntered}
       <div class="key-gate">
-        <div class="gate-icon">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#00c8b4" stroke-width="0.75">
-            <rect x="3" y="11" width="18" height="11" rx="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-        </div>
+
         <h2 class="gate-title">Enter Room Key</h2>
-        <p class="gate-sub">Vault Room #{roomId.toString().padStart(4, '0')}</p>
+        <p class="gate-sub">
+          Vault Room #{roomId.toString().padStart(4, "0")}
+        </p>
 
         <input
           class="gate-input"
           type="text"
           placeholder="VC-XXXX-XXXX-XXXX"
           bind:value={sessionKey}
-          onkeydown={(e) => e.key === 'Enter' && enterRoom()}
+          onkeydown={(e) => e.key === "Enter" && enterRoom()}
         />
 
         {#if keyError}
@@ -221,47 +258,42 @@
 
         <button class="submit-btn" onclick={enterRoom}>
           VERIFY & ENTER
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="5" y1="12" x2="19" y2="12"/>
-            <polyline points="12 5 19 12 12 19"/>
-          </svg>
         </button>
       </div>
 
     {:else}
       <div class="room-header">
+
         <div>
           <button class="back-btn" onclick={() => goto("/vault")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <line x1="19" y1="12" x2="5" y2="12"/>
-              <polyline points="12 19 5 12 12 5"/>
-            </svg>
             BACK
           </button>
+
           <h1 class="room-title">{room?.name}</h1>
+
           <div class="room-meta-row">
-            <span class="room-meta-item">VAULT #{roomId.toString().padStart(4, '0')}</span>
-            <span class="room-meta-dot">·</span>
-            <span class="room-meta-item">{room?.memberCount} members</span>
-            <span class="room-meta-dot">·</span>
-            <span class="room-meta-item">Creator: {shortAddress(room?.creator)}</span>
+            <span>VAULT #{roomId.toString().padStart(4, "0")}</span>
+            <span>·</span>
+            <span>{room?.memberCount} members</span>
+            <span>·</span>
+            <span>{shortAddress(room?.creator)}</span>
           </div>
         </div>
 
         {#if canUpload}
-          <label class="upload-btn" class:disabled={uploading} aria-label="Upload file">
+          <label class="upload-btn">
             {#if uploading}
-              <div class="btn-spinner-dark"></div>
               UPLOADING...
             {:else}
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
               UPLOAD FILE
             {/if}
-            <input type="file" onchange={uploadFile} style="display:none" disabled={uploading} />
+
+            <input
+              type="file"
+              onchange={uploadFile}
+              hidden
+              disabled={uploading}
+            />
           </label>
         {/if}
       </div>
@@ -271,63 +303,37 @@
       {/if}
 
       {#if loading}
-        <div class="loading-state">
-          <div class="loading-bar"></div>
-          <p>Loading files from blockchain...</p>
-        </div>
+        <p>Loading files...</p>
       {:else if files.length === 0}
-        <div class="empty-state">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(0,200,180,0.2)" stroke-width="0.75">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-          </svg>
-          <p class="empty-title">No files yet</p>
-          <p class="empty-sub">{canUpload ? 'Upload the first file to this vault' : 'The room creator has not uploaded any files yet'}</p>
-        </div>
+        <p>No files yet</p>
       {:else}
         <div class="files-list">
           {#each files as file}
             <div class="file-card">
-              <div class="file-corner"></div>
-              <div class="file-left">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(0,200,180,0.5)" stroke-width="1">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                </svg>
-                <div class="file-info">
-                  <div class="file-name">{file.fileName}</div>
-                  <div class="file-meta">
-                    {shortAddress(file.uploader)} · {formatSize(file.fileSize)} · Block #{file.blockNumber} · {timeAgo(file.uploadedAt)}
-                  </div>
-                  <div class="file-cid">{file.ipfsCID.slice(0, 20)}...</div>
-                </div>
+
+              <div>
+                <div>{file.fileName}</div>
+                <small>
+                  {shortAddress(file.uploader)} · {formatSize(file.fileSize)}
+                </small>
               </div>
-              <div class="file-right">
+
+              <div>
                 {#if verifyResults[file.id] === true}
-                  <div class="verify-badge verified">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                    VERIFIED
-                  </div>
+                  VERIFIED
                 {:else if verifyResults[file.id] === false}
-                  <div class="verify-badge tampered">TAMPERED</div>
+                  TAMPERED
                 {:else}
-                  <button class="verify-btn" onclick={() => verifyFile(file)}>VERIFY</button>
+                  <button onclick={() => verifyFile(file)}>
+                    VERIFY
+                  </button>
                 {/if}
-                <a
-                  href="https://ipfs.io/ipfs/{file.ipfsCID}"
-                  target="_blank"
-                  class="download-btn"
-                  aria-label="Download {file.fileName}"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
-                </a>
+
+                <button onclick={() => openFilePreview(file)}>
+                  PREVIEW
+                </button>
               </div>
+
             </div>
           {/each}
         </div>
@@ -336,6 +342,8 @@
 
   </div>
 </div>
+
+<ImageModal bind:isOpen={modalOpen} imageUrl={selectedFileUrl} fileName={selectedFileName} />
 
 <style>
 .room-page {

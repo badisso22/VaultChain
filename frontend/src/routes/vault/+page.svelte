@@ -1,18 +1,19 @@
 <script>
-  import { connected, userAddress } from "$lib/stores/wallet.js";
-  import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
   import { ethers } from "ethers";
+  import { browser } from "$app/environment";
   import { addresses } from "$lib/contracts/addresses.js";
+  import { connected, userAddress } from "$lib/stores/wallet.js";
+
   import vaultRoomABI from "$lib/contracts/vaultRoom.json";
 
-  let myRooms = [];
-  let loading = true;
-  let errorMsg = "";
+  let myRooms = $state([]);
+  let loading = $state(true);
+  let errorMsg = $state("");
 
-  let mounted = false;
-  let hasRedirectedHome = false;
-  let currentLoadingAddress = "";
+  let mounted = $state(false);
+  let hasRedirectedHome = $state(false);
+  let currentLoadingAddress = $state("");
 
   // mark as mounted
   $effect(() => {

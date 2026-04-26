@@ -6,9 +6,9 @@
   import { hashKey } from "$lib/utils/keyGen.js";
   import vaultRoomABI from "$lib/contracts/vaultRoom.json";
 
-  let roomKey = "";
-  let loading = false;
-  let error = "";
+  let roomKey = $state("");
+  let loading = $state(false);
+  let error = $state("");
 
   $effect(() => {
     if (!$connected) goto("/");
