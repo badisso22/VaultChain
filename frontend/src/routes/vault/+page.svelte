@@ -1,25 +1,29 @@
 <script>
   import { connected, userAddress } from "$lib/stores/wallet.js";
   import { goto } from "$app/navigation";
-  import { get } from "svelte/store";
   import { ethers } from "ethers";
   import { addresses } from "$lib/contracts/addresses.js";
   import vaultRoomABI from "$lib/contracts/vaultRoom.json";
 
   let myRooms = [];
   let loading = true;
+  let errorMsg = "";
 
   $effect(() => {
     if (!$connected) goto("/");
   });
 
   $effect(() => {
-    if ($connected && $userAddress) loadMyRooms();
+    if ($connected && $userAddress) {
+      loadMyRooms();
+    }
   });
 
   async function loadMyRooms() {
     try {
       loading = true;
+      errorMsg = "";
+
       const provider = new ethers.BrowserProvider(window.ethereum);
       const contract = new ethers.Contract(
         addresses.vaultRoom,
@@ -28,24 +32,38 @@
       );
 
       const roomIds = await contract.getMemberRooms($userAddress);
+      console.log("Room IDs found:", roomIds);
 
-      const rooms = await Promise.all(
-        roomIds.map(async (id) => {
+      if (roomIds.length === 0) {
+        myRooms = [];
+        loading = false;
+        return;
+      }
+
+      const rooms = [];
+      for (let i = 0; i < roomIds.length; i++) {
+        try {
+          const id = Number(roomIds[i]);
           const room = await contract.getRoom(id);
-          return {
-            id: Number(room.id),
+          rooms.push({
+            id: id,
             name: room.name,
             creator: room.creator,
             memberCount: Number(room.memberCount),
             creatorOnlyUpload: room.creatorOnlyUpload,
             createdAt: Number(room.createdAt),
-          };
-        })
-      );
+          });
+        } catch (e) {
+          console.error("Failed to load room", Number(roomIds[i]), e);
+        }
+      }
 
       myRooms = rooms;
+      console.log("Rooms loaded:", myRooms);
+
     } catch (error) {
       console.error("Failed to load rooms:", error);
+      errorMsg = "Failed to load rooms: " + error.message;
     } finally {
       loading = false;
     }
@@ -94,6 +112,10 @@
       </div>
     </div>
 
+    {#if errorMsg}
+      <div class="error-msg">{errorMsg}</div>
+    {/if}
+
     {#if loading}
       <div class="loading-state">
         <div class="loading-bar"></div>
@@ -106,11 +128,21 @@
         </svg>
         <p class="empty-title">No rooms yet</p>
         <p class="empty-sub">Create a vault room or join one with a key</p>
+        <div class="empty-actions">
+          <button class="btn-primary" onclick={() => goto("/create")}>CREATE ROOM</button>
+          <button class="btn-secondary" onclick={() => goto("/join")}>JOIN ROOM</button>
+        </div>
       </div>
     {:else}
       <div class="rooms-grid">
         {#each myRooms as room}
-          <div class="room-card" onclick={() => goto(`/room/${room.id}`)}>
+          <div
+            class="room-card"
+            onclick={() => goto(`/room/${room.id}`)}
+            role="button"
+            tabindex="0"
+            onkeydown={(e) => e.key === 'Enter' && goto(`/room/${room.id}`)}
+          >
             <div class="room-corner"></div>
             <div class="room-id">VAULT #{room.id.toString().padStart(4, '0')}</div>
             <div class="room-name">{room.name}</div>
@@ -210,8 +242,15 @@
   transition: all 0.2s;
 }
 
-.btn-secondary:hover {
-  background: rgba(0,200,180,0.05);
+.btn-secondary:hover { background: rgba(0,200,180,0.05); }
+
+.error-msg {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgba(220,80,80,0.8);
+  border: 0.5px solid rgba(220,80,80,0.2);
+  padding: 10px 14px;
+  margin-bottom: 20px;
 }
 
 .loading-state {
@@ -268,6 +307,13 @@
 .empty-sub {
   font-size: 13px;
   color: rgba(226,232,240,0.25);
+  margin-bottom: 8px;
+}
+
+.empty-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
 }
 
 .rooms-grid {
@@ -366,4 +412,4 @@
   font-size: 10px;
   color: rgba(226,232,240,0.25);
 }
-</style>s
+</style>
