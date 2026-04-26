@@ -481,4 +481,11 @@
   font-size: 11px;
   color: rgba(0,200,180,0.7);
 }
+.toggle-option {
+  width: 100%;
+  text-align: left;
+  background: var(--bg);
+  border: none;
+  cursor: pointer;
+}
 </style>
