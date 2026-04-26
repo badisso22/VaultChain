@@ -2,7 +2,7 @@
   import { ethers } from "ethers";
   import { onMount, onDestroy } from "svelte";
 
-  const ALCHEMY_RPC_URL = process.env.ALCHEMY_RPC_URL;
+  const ALCHEMY_RPC_URL = import.meta.env.VITE_ALCHEMY_RPC_URL;
 
   let blocks = [];
   let provider;
@@ -23,6 +23,11 @@
 
   async function fetchLatestBlocks() {
     try {
+      if (!ALCHEMY_RPC_URL) {
+        console.warn("VITE_ALCHEMY_RPC_URL is not set. BlockVisualizer will not fetch data.");
+        return;
+      }
+      
       provider = new ethers.JsonRpcProvider(ALCHEMY_RPC_URL);
       const latest = await provider.getBlockNumber();
       totalBlocks = latest;
